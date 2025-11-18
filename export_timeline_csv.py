@@ -12,7 +12,7 @@ Core logic for exporting a Premiere Pro timeline to CSV.
 """
 
 # This is a circular import if not handled carefully.
-# We create a separate helpers file to avoid this.
+# I created a separate helpers file to avoid this.
 from components.helpers import tc_from_seconds, tc_to_seconds
 
 def ln(t):
@@ -686,3 +686,4 @@ if __name__=='__main__':
         f.write(generate_timeline_csv_string(final_data))
 
     print(f'Wrote CSV to {out_path}')
+

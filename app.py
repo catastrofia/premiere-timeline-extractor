@@ -19,6 +19,10 @@ app.secret_key = 'supersecretkey' # Needed for flashing messages
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Create upload folder if it doesn't exist. This needs to be at the top level.
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 @app.route('/', methods=['GET'])
 def index():
     """Render the main upload page."""
@@ -166,4 +170,5 @@ if __name__ == '__main__':
     if not os.path.exists('templates/index.html'):
         print("Please create a 'templates/index.html' file for the web interface.")
     
+
     app.run(debug=True)

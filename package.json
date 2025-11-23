@@ -1,6 +1,6 @@
 {
   "name": "premiere-timeline-extractor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A web-based tool to extract timeline information from Adobe Premiere Pro project files.",
   "repository": {
     "type": "git",

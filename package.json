@@ -6,8 +6,5 @@
     "type": "git",
     "url": "https://github.com/catastrofia/premiere-timeline-extractor.git"
   },
-  "author": "catastrofia",
-  "scripts": {
-    "release": "standard-version"
-  }
+  "author": "catastrofia"
 }

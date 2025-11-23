@@ -4,22 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Premiere Pro Timeline Exporter</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 2em; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #4a4a4a; }
-        .form-group { margin-bottom: 1.5em; }
-        label { display: block; margin-bottom: 0.5em; font-weight: bold; }
-        input[type="file"], select { width: 100%; padding: 0.75em; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #007bff; color: white; padding: 0.75em 1.5em; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
-        button:hover { background-color: #0056b3; }
-        .file-display { padding: 0.75em; border: 1px solid #ccc; border-radius: 4px; background-color: #e9ecef; color: #495057; }
-        .flash { padding: 1em; margin-bottom: 1em; border-radius: 4px; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>Premiere Pro Timeline Exporter</h1>
+    <div class="container container-narrow">
+        <h1>Premiere Pro Timeline Exporter <span class="version-badge">v{{ app_version }}</span></h1>
         <p>Upload your unzipped <strong>.prproj</strong> file to generate a timeline CSV.</p>
 
         {% with messages = get_flashed_messages() %}
@@ -57,5 +46,12 @@
             {% endif %}
         </form>
     </div>
+
+    <footer>
+        <div class="footer-content">
+            <a href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+            <span>Version {{ app_version }}</span>
+        </div>
+    </footer>
 </body>
 </html>

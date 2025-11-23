@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, make_response, flash, redirect, url_for
 import os
 import uuid
+import json
 import gzip
 import io
 import csv
@@ -15,6 +16,31 @@ from components.visualizer_processor import process_data_for_visualizer
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey' # Needed for flashing messages
+
+# Function to load app info from package.json
+def load_app_info():
+    try:
+        with open('package.json') as f:
+            data = json.load(f)
+            version = data.get('version', 'unknown')
+            repo_url = data.get('repository', {}).get('url', '#')
+            # Clean up git+https prefix if it exists
+            if repo_url.startswith('git+'):
+                repo_url = repo_url[4:]
+            # Remove .git suffix if it exists
+            if repo_url.endswith('.git'):
+                repo_url = repo_url[:-4]
+            return {'version': version, 'repo_url': repo_url}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {'version': '1.0.0', 'repo_url': 'https://github.com/catastrofia/premiere-timeline-extractor'}
+
+# Make app info available to all templates
+@app.context_processor
+def inject_app_info():
+    app_info = load_app_info()
+    return dict(app_version=app_info['version'], repo_url=app_info['repo_url'])
+
+# --- END OF ADDED CODE ---
 
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER

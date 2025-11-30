@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 from export_timeline_csv import generate_timeline_data, list_named_sequences_from_content
 from components.table_processor import process_data_for_tables
 from components.visualizer_processor import process_data_for_visualizer
+from components.helpers import tc_from_seconds
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey' # Needed for flashing messages
@@ -77,12 +78,14 @@ def upload_file():
         except (gzip.BadGzipFile, OSError):
             xml_content = file_bytes.decode('utf-8', errors='replace')
 
+        sequences = list_named_sequences_from_content(xml_content)
+
         try:
             log_stream = io.StringIO()
             with redirect_stdout(log_stream):
                 # Step 1: Generate raw data from the project file.
                 # We only need to run the main generator once.
-                grouped_data_raw, per_instance_data_raw = generate_timeline_data(
+                grouped_data_raw, per_instance_data_raw, fps_to_use, _ = generate_timeline_data(
                     xml_content=xml_content,
                     main_seq_name=main_seq_name,
                     debug=True # Enable debug logging
@@ -90,7 +93,7 @@ def upload_file():
 
             debug_logs = log_stream.getvalue().splitlines()
 
-            os.remove(temp_file_path) # Clean up the temporary file
+            # os.remove(temp_file_path) # Keep file for sequence switching
 
             # Step 2: Process raw data for the tables.
             cleaned_grouped_headers, grouped_data, per_instance_data_for_table = process_data_for_tables(
@@ -113,9 +116,10 @@ def upload_file():
             grouped_csv_string = to_csv_string(grouped_data_raw)
             per_instance_csv_string = to_csv_string(per_instance_data_raw)
 
-            return render_template('results.html', 
+            formatted_duration = tc_from_seconds(timeline_duration)
+            return render_template('results.html',
                                    grouped_csv=grouped_csv_string,
-                                   grouped_headers=cleaned_grouped_headers, 
+                                   grouped_headers=cleaned_grouped_headers,
                                    grouped_data=grouped_data,
                                    per_instance_csv=per_instance_csv_string,
                                    per_instance_headers=per_instance_data_raw['headers'],
@@ -123,7 +127,13 @@ def upload_file():
                                    timeline_items=timeline_items,
                                    total_non_audio_tracks=total_non_audio_tracks,
                                    timeline_duration=timeline_duration,
-                                   debug_logs=debug_logs)
+                                   debug_logs=debug_logs,
+                                   sequence_name=main_seq_name,
+                                   fps=fps_to_use,
+                                   duration=timeline_duration,
+                                   formatted_duration=formatted_duration,
+                                   sequences=sequences,
+                                   temp_file_id=temp_file_id)
 
         except Exception as e:
             if os.path.exists(temp_file_path):

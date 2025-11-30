@@ -253,3 +253,38 @@ input:checked + .slider:before { transform: translateX(26px); }
     font-size: 12px;
     line-height: 1.4;
 }
+
+/* --- Sequence Info Styles --- */
+.sequence-name {
+    font-weight: bold;
+    color: #007bff;
+}
+
+.sequence-info {
+    background-color: #e9ecef;
+    padding: 1em;
+    border-radius: 4px;
+    margin-bottom: 1.5em;
+    border-left: 4px solid #007bff;
+}
+
+.sequence-info p {
+    margin: 0 0 0.5em 0;
+    font-size: 1.1em;
+}
+
+.sequence-info form {
+    margin: 0;
+}
+
+.sequence-info label {
+    font-weight: bold;
+    margin-right: 0.5em;
+}
+
+.sequence-info select {
+    padding: 0.5em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+}

@@ -15,6 +15,19 @@ Core logic for exporting a Premiere Pro timeline to CSV.
 # I created a separate helpers file to avoid this.
 from components.helpers import tc_from_seconds, tc_to_seconds
 
+def load_project_file(path):
+    """Reads a .prproj (gzipped) or unzipped XML file and returns its content as a string."""
+    with open(path, "rb") as f:
+        data = f.read()
+    try:
+        # Try to decompress, assuming it's a gzipped .prproj
+        xml_data = gzip.decompress(data)
+    except (gzip.BadGzipFile, OSError):
+        # If it fails, it's likely already unzipped XML
+        xml_data = data
+    return xml_data.decode('utf-8', errors='replace')
+
+
 def ln(t):
     return t.split('}')[-1] if '}' in t else t
 
@@ -39,7 +52,7 @@ def seconds_aligned_from_raw(raw, ticks_per_frame, fps_override):
     seconds = frames_rounded / float(fps_override)
     return seconds
 
-def generate_timeline_data(xml_content, main_seq_name, fps_override=23.976, cap=None, debug=False, debug_log_path=None):
+def generate_timeline_data(xml_content, main_seq_name, fps_override=None, cap=None, debug=False, debug_log_path=None):
     """
     Processes XML content from a .prproj file.
     Returns two dictionaries, one for grouped data and one for per-instance data.
@@ -147,6 +160,9 @@ def generate_timeline_data(xml_content, main_seq_name, fps_override=23.976, cap=
             log(f'[DEBUG] Successfully found FrameRate for sequence "{main_seq_name}": {frame_rate_value} (Interpreted as {familiar_fps} FPS).')
         else:
             log(f'[DEBUG] Successfully found FrameRate for sequence "{main_seq_name}": {frame_rate_value} (Uncommon value).')
+
+        fps_to_use = fps_override if fps_override is not None else (familiar_fps or 23.976)
+        log(f'[DEBUG] Using FPS: {fps_to_use} (ticks_per_frame: {frame_rate_value}).')
 
 
     # helper to find track UIDs for a sequence element
@@ -339,8 +355,8 @@ def generate_timeline_data(xml_content, main_seq_name, fps_override=23.976, cap=
         s_raw = ins['start_raw']; e_raw = ins['end_raw']
         if frame_rate_value is None:
             log(f"Skipping instance due to missing frame_rate_value: {ins.get('name')}")
-        s_sec = seconds_aligned_from_raw(s_raw, frame_rate_value, fps_override)
-        e_sec = seconds_aligned_from_raw(e_raw, frame_rate_value, fps_override)
+        s_sec = seconds_aligned_from_raw(s_raw, frame_rate_value, fps_to_use)
+        e_sec = seconds_aligned_from_raw(e_raw, frame_rate_value, fps_to_use)
         if s_sec is None or e_sec is None:
             continue
         # drop instances that start at or after cap
@@ -351,32 +367,37 @@ def generate_timeline_data(xml_content, main_seq_name, fps_override=23.976, cap=
         if e_sec <= s_sec:
             # skip degenerate
             continue
+        if e_sec - s_sec < 1 and s_sec < 3600:
+            e_sec = s_sec + 1
         # carry through source info if available
         processed.append({'name':ins.get('name'),'start_sec':s_sec,'end_sec':e_sec,'start_tc':tc_from_seconds(s_sec),'end_tc':tc_from_seconds(e_sec),'source_path':ins.get('source_path'),'source_filename':ins.get('source_filename'), 'source_sequence': ins.get('source_sequence')})
 
     log(f'{len(processed)} instances remaining after time conversion and capping.')
 
-    # filter out unnamed clips and remove duplicate instances (same start/end TC for same clip)
+    # filter out unnamed clips only (keep all instances, including duplicates from different nested sequences)
     filtered = []
-    seen_by_name = {}
     for p in processed:
         name = p.get('name')
-        # drop completely unnamed
         if not name:
             continue
-        # drop <unnamed-...> placeholders
         if isinstance(name, str) and name.startswith('<unnamed-'):
             continue
-        key = (p['start_tc'], p['end_tc'])
-        s = seen_by_name.setdefault(name, set())
-        if key in s:
-            # duplicate instance for that clip name -> skip
-            continue
-        s.add(key)
         filtered.append(p)
 
     processed = filtered
-    log(f'{len(processed)} instances remaining after filtering unnamed/duplicate clips.')
+    log(f'{len(processed)} instances remaining after filtering unnamed clips.')
+
+    # Deduplicate instances that come from the same parent nested sequence (or main sequence) and have the same timecodes
+    seen = set()
+    unique_processed = []
+    for p in processed:
+        parent = p.get('source_sequence') or 'Main'
+        key = (p['name'], parent, p['start_tc'], p['end_tc'])
+        if key not in seen:
+            seen.add(key)
+            unique_processed.append(p)
+    processed = unique_processed
+    log(f'{len(processed)} instances remaining after deduplication by (name, parent_sequence, start_tc, end_tc).')
 
     # group by name
     groups = {}
@@ -499,7 +520,18 @@ def generate_timeline_data(xml_content, main_seq_name, fps_override=23.976, cap=
     rows = []
     for name, instances in groups.items():
         insts_sorted = sorted(instances, key=lambda x: x['start_sec'])
-        inst_strings = [f"{i['start_tc']}-{i['end_tc']}" for i in insts_sorted]
+        intervals = [(i['start_sec'], i['end_sec']) for i in insts_sorted]
+        merged = []
+        if intervals:
+            current_start, current_end = intervals[0]
+            for start, end in intervals[1:]:
+                if start <= current_end:
+                    current_end = max(current_end, end)
+                else:
+                    merged.append((current_start, current_end))
+                    current_start, current_end = start, end
+            merged.append((current_start, current_end))
+        inst_strings = [f"{tc_from_seconds(s)}-{tc_from_seconds(e)}" for s, e in merged]
         earliest = insts_sorted[0]['start_sec']
         # detect type using first instance's source info (best-effort)
         first = insts_sorted[0]
@@ -540,7 +572,7 @@ def generate_timeline_data(xml_content, main_seq_name, fps_override=23.976, cap=
             debug_fh.close()
         except Exception:
             pass
-    return grouped_data, per_instance_data
+    return grouped_data, per_instance_data, fps_to_use, frame_rate_value
 
 def list_named_sequences_from_content(xml_content):
     """Parses XML content and returns a list of named sequences."""
@@ -641,25 +673,12 @@ if __name__=='__main__':
                     continue
                 print('Invalid choice, try again.')
 
-    def load_project_file(path):
-        """Reads a .prproj (gzipped) or unzipped XML file and returns its content as a string."""
-        with open(path, "rb") as f:
-            data = f.read()
-        try:
-            # Try to decompress, assuming it's a gzipped .prproj
-            xml_data = gzip.decompress(data)
-        except (gzip.BadGzipFile, OSError):
-            # If it fails, it's likely already unzipped XML
-            xml_data = data
-        return xml_data.decode('utf-8', errors='replace')
-
     grouped_data, per_instance_data = generate_timeline_data(
         xml_content=xml_content_main,
         main_seq_name=main_seq_name,
-        # If fps is not provided, default to 23.976
-        fps_override=args.fps if args.fps is not None else 23.976,
+        fps_override=args.fps,
         cap=args.cap,
-        debug=args.debug, 
+        debug=args.debug,
         debug_log_path=args.debug_log)
     
     final_data = per_instance_data if args.per_instance else grouped_data

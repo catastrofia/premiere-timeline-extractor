@@ -9,12 +9,27 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <div id="timeline-tooltip"></div>
     <div class="container">
         <header class="results-header">
             <h2>Premiere Pro Timeline Exporter <span class="version-badge">v{{ app_version }}</span></h2>
         </header>
 
-        <h2>Timeline Results</h2>
+        <h2>Timeline Results: <span class="sequence-name">{{ sequence_name }}</span></h2>
+        <div class="sequence-info">
+            <p><strong>Detected FPS:</strong> {{ "%.3f"|format(fps) }} | <strong>Duration:</strong> {{ formatted_duration }}</p>
+            {% if sequences and sequences|length > 1 %}
+            <form action="/upload" method="post" style="display: inline-block; margin-top: 0.5em;">
+                <input type="hidden" name="temp_file_id" value="{{ temp_file_id }}">
+                <label for="sequence-select">Switch Sequence:</label>
+                <select id="sequence-select" name="sequence" onchange="this.form.submit()">
+                    {% for seq in sequences %}
+                    <option value="{{ seq }}" {% if seq == sequence_name %}selected{% endif %}>{{ seq }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% endif %}
+        </div>
 
         <div class="actions">
             <button id="download-csv">Download CSV</button>
@@ -79,6 +94,7 @@
                 <select id="type-filter">
                     <option value="">All Types</option>
                 </select>
+                <label><input type="checkbox" id="hide-graphics"> Hide Graphics</label>
                 <div class="radio-group">
                     <label><input type="radio" name="audio-filter" value="all" checked> Show All</label>
                     <label><input type="radio" name="audio-filter" value="video-only"> Video Only</label>
@@ -139,15 +155,15 @@
     </footer>
 
     <script>
-        const groupedCsv = {{ grouped_csv|tojson }};
-        const perInstanceCsv = {{ per_instance_csv|tojson }};
-        const timelineItems = {{ timeline_items|tojson }};
-        console.log("Backend data received:", { groupedCsv, perInstanceCsv, timelineItems });
+        const groupedCsv = `{{ grouped_csv|tojson }}`;
+        const perInstanceCsv = `{{ per_instance_csv|tojson }}`;
+        const timelineItems = JSON.parse(`{{ timeline_items|tojson }}`);
+        console.log("Backend data received:", { groupedCsv: groupedCsv, perInstanceCsv: perInstanceCsv, timelineItems: timelineItems });
 
 
         // --- Timeline Data & State ---
         let zoomLevel = 1.0; // 1.0 = 100%
-        const timelineDuration = {{ timeline_duration }};
+        const timelineDuration = Number(`{{ timeline_duration }}`);
 
         // Convert timecode (HH:MM:SS) to seconds
         function tcToSeconds(tc) {
@@ -338,6 +354,7 @@
         const searchInput = document.getElementById('search-input');
         const typeFilter = document.getElementById('type-filter');
         const audioFilters = document.querySelectorAll('input[name="audio-filter"]');
+        const hideGraphicsCheckbox = document.getElementById('hide-graphics');
 
         // Populate type filter dropdown
         const clipTypes = new Set();
@@ -357,6 +374,7 @@
             const searchText = searchInput.value.toLowerCase();
             const selectedType = typeFilter.value;
             const audioFilterValue = document.querySelector('input[name="audio-filter"]:checked').value;
+            const hideGraphics = hideGraphicsCheckbox.checked;
 
             const tables = [groupedTable, perInstanceTable];
             tables.forEach(table => {
@@ -374,8 +392,9 @@
                     } else if (audioFilterValue === 'video-only') {
                         audioMatch = rowType !== 'Audio';
                     }
+                    const graphicsMatch = !hideGraphics || rowType !== 'Graphic';
 
-                    row.style.display = (searchMatch && typeMatch && audioMatch) ? '' : 'none';
+                    row.style.display = (searchMatch && typeMatch && audioMatch && graphicsMatch) ? '' : 'none';
                 });
             });
         }
@@ -383,6 +402,7 @@
         searchInput.addEventListener('keyup', applyFilters);
         typeFilter.addEventListener('change', applyFilters);
         audioFilters.forEach(radio => radio.addEventListener('change', applyFilters));
+        hideGraphicsCheckbox.addEventListener('change', applyFilters);
 
     </script>
 
@@ -584,5 +604,6 @@
         });
 
     </script>
+
 </body>
 </html>

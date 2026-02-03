@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from collections import defaultdict
 from werkzeug.utils import secure_filename
 
-# Import the refactored functions from your script
+# Import functions from project scripts
 from export_timeline_csv import generate_timeline_data, list_named_sequences_from_content
 from components.table_processor import process_data_for_tables
 from components.visualizer_processor import process_data_for_visualizer
@@ -41,7 +41,6 @@ def inject_app_info():
     app_info = load_app_info()
     return dict(app_version=app_info['version'], repo_url=app_info['repo_url'])
 
-# --- END OF ADDED CODE ---
 
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -84,7 +83,7 @@ def upload_file():
             log_stream = io.StringIO()
             with redirect_stdout(log_stream):
                 # Step 1: Generate raw data from the project file.
-                # We only need to run the main generator once.
+                # Generator only needs to run once.
                 grouped_data_raw, per_instance_data_raw, fps_to_use, _ = generate_timeline_data(
                     xml_content=xml_content,
                     main_seq_name=main_seq_name,
@@ -208,3 +207,4 @@ if __name__ == '__main__':
     
 
     app.run(debug=True)
+

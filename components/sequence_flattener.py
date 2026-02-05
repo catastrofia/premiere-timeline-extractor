@@ -4,6 +4,7 @@ Handles recursive flattening of nested sequences into a linear timeline.
 """
 from typing import Dict, List, Optional, Tuple, Any, Set
 import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element
 from dataclasses import dataclass, field
 from components.logger import get_logger
 from components.xml_parser import ln, int_or_none
@@ -13,7 +14,7 @@ logger = get_logger()
 @dataclass
 class TrackItem:
     """Represents a track item in a Premiere Pro sequence."""
-    ti_obj: ET.Element
+    ti_obj: Element
     start: Optional[int] = None
     end: Optional[int] = None
     duration: Optional[int] = None
@@ -36,8 +37,8 @@ class FlattenedInstance:
 class SequenceFlattener:
     """Flattens nested sequences in Premiere Pro projects."""
     
-    def __init__(self, objectid_map: Dict[str, ET.Element], objectuid_map: Dict[str, ET.Element], 
-                 sequence_name_map: Dict[str, ET.Element]):
+    def __init__(self, objectid_map: Dict[str, Element], objectuid_map: Dict[str, Element],
+                 sequence_name_map: Dict[str, Element]):
         """
         Initialize the sequence flattener.
         
@@ -50,7 +51,7 @@ class SequenceFlattener:
         self.objectuid_map = objectuid_map
         self.sequence_name_map = sequence_name_map
     
-    def track_uids_for_sequence(self, seq_elem: ET.Element) -> List[str]:
+    def track_uids_for_sequence(self, seq_elem: Element) -> List[str]:
         """
         Find track UIDs for a sequence element.
         
@@ -240,7 +241,7 @@ class SequenceFlattener:
         
         return items
     
-    def flatten_sequence(self, seq_elem: ET.Element, parent_offset_raw: int = 0, 
+    def flatten_sequence(self, seq_elem: Element, parent_offset_raw: int = 0,
                          parent_bound_raw: Optional[int] = None, 
                          source_sequence_name: Optional[str] = None) -> List[FlattenedInstance]:
         """

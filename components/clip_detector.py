@@ -5,6 +5,7 @@ Determines clip types (Video, Audio, Image, Graphic) based on file extensions an
 import re
 from typing import Dict, List, Optional, Set, Tuple, Any, Union
 import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element
 from config import config
 from components.logger import get_logger
 from components.xml_parser import ln
@@ -100,8 +101,8 @@ class ClipTypeDetector:
         return ('Unknown', None)
     
     def find_extension_in_project(self, 
-                                 name: Optional[str], 
-                                 root: ET.Element) -> Optional[Tuple[str, str, str]]:
+                                 name: Optional[str],
+                                 root: Element) -> Optional[Tuple[str, str, str]]:
         """
         Search the entire project for an extension associated with the clip name.
         
@@ -134,8 +135,8 @@ class ClipTypeDetector:
         return None
     
     def detect_from_project_search(self, 
-                                  name: str, 
-                                  root: ET.Element) -> Tuple[str, Optional[str]]:
+                                  name: str,
+                                  root: Element) -> Tuple[str, Optional[str]]:
         """
         Detect clip type by searching the project for extension references.
         Used when initial detection returns 'Unknown'.

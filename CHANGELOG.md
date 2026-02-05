@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.2] - 2026-02-05
+
+### Fixed
+- Fixed `AttributeError: module 'defusedxml.ElementTree' has no attribute 'Element'` in all component files (xml_parser.py, clip_detector.py, sequence_flattener.py) - Python 3.13 evaluates type annotations at class definition time, and defusedxml doesn't export the Element class. Solution: import `Element` from stdlib `xml.etree.ElementTree` for type hints while keeping defusedxml for secure XML parsing.
+
 ## [1.3.1] - 2026-02-05
 
 ### Fixed
@@ -9,7 +14,7 @@ All notable changes to this project will be documented in this file. See [standa
 - Fixed `AttributeError: 'Logger' object has no attribute 'DEBUG'` in export_timeline_csv.py - changed `logger.DEBUG` to `DEBUG` (imported from components.logger)
 - Fixed `AttributeError: '_io.StringIO' object has no attribute 'string_io'` in app.py - LogCapture context manager returns StringIO directly, not via `.string_io` attribute
 - Fixed timeline visualizer showing empty - race condition where JavaScript rendered before data was loaded; moved data initialization to global `backendData` variable before loading results.js
-- Fixed `AttributeError: module 'defusedxml.ElementTree' has no attribute 'Element'` - imported `Element` from stdlib `xml.etree.ElementTree` for type hints while keeping defusedxml for secure parsing
+- Fixed `AttributeError: module 'defusedxml.ElementTree' has no attribute 'Element'` in xml_parser.py - imported `Element` from stdlib `xml.etree.ElementTree` for type hints while keeping defusedxml for secure parsing
 
 ## [1.3.0] - 2026-02-05
 

@@ -9,14 +9,23 @@ from contextlib import redirect_stdout
 from collections import defaultdict
 from werkzeug.utils import secure_filename
 
+# Import configuration and logging
+from config import config
+from components.logger import get_logger, setup_logging, LogCapture, INFO
+
 # Import functions from project scripts
 from export_timeline_csv import generate_timeline_data, list_named_sequences_from_content
 from components.table_processor import process_data_for_tables
 from components.visualizer_processor import process_data_for_visualizer
-from components.helpers import tc_from_seconds
+from components.helpers import tc_from_seconds, sanitize_html
+from components.validators import validate_upload
+from components.cleanup import schedule_cleanup
+
+# Get logger
+logger = get_logger()
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey' # Needed for flashing messages
+app.secret_key = config.SECRET_KEY or os.urandom(32) # Needed for flashing messages
 
 # Function to load app info from package.json
 def load_app_info():
@@ -41,13 +50,18 @@ def inject_app_info():
     app_info = load_app_info()
     return dict(app_version=app_info['version'], repo_url=app_info['repo_url'])
 
+# Add sanitize_html as a template filter
+@app.template_filter('sanitize')
+def sanitize_filter(content):
+    return sanitize_html(content)
 
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Set upload folder from config
+app.config['UPLOAD_FOLDER'] = config.UPLOAD_FOLDER
 
 # Create upload folder if it doesn't exist. This needs to be at the top level.
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+if not os.path.exists(config.UPLOAD_FOLDER):
+    os.makedirs(config.UPLOAD_FOLDER)
 
 @app.route('/', methods=['GET'])
 def index():
@@ -65,6 +79,7 @@ def upload_file():
         temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_file_id)
 
         if not os.path.exists(temp_file_path) or not main_seq_name:
+            logger.warning(f"Temporary file not found or sequence not selected: {temp_file_id}")
             flash('Temporary file not found or sequence not selected. Please upload again.')
             return redirect(url_for('index'))
 
@@ -80,17 +95,19 @@ def upload_file():
         sequences = list_named_sequences_from_content(xml_content)
 
         try:
-            log_stream = io.StringIO()
-            with redirect_stdout(log_stream):
+            # Use LogCapture to capture logs instead of redirect_stdout
+            with LogCapture() as log_capture:
+                logger.info(f"Generating timeline data for sequence: {main_seq_name}")
                 # Step 1: Generate raw data from the project file.
                 # Generator only needs to run once.
-                grouped_data_raw, per_instance_data_raw, fps_to_use, _ = generate_timeline_data(
+                grouped_data_raw, per_instance_data_raw, fps_to_use, frame_rate_value = generate_timeline_data(
                     xml_content=xml_content,
                     main_seq_name=main_seq_name,
                     debug=True # Enable debug logging
                 )
+                logger.info(f"Timeline data generated successfully. FPS: {fps_to_use}, Raw frame rate: {frame_rate_value}")
 
-            debug_logs = log_stream.getvalue().splitlines()
+            debug_logs = log_capture.getvalue().splitlines()
 
             # os.remove(temp_file_path) # Keep file for sequence switching
 
@@ -135,8 +152,10 @@ def upload_file():
                                    temp_file_id=temp_file_id)
 
         except Exception as e:
+            logger.error(f"Error during CSV generation: {e}", exc_info=True)
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+                logger.info(f"Removed temporary file: {temp_file_path}")
             flash(f'An error occurred during CSV generation: {e}')
             return redirect(url_for('index'))
 
@@ -147,6 +166,13 @@ def upload_file():
         return redirect(request.url)
     
     file = request.files['file']
+    
+    try:
+        validate_upload(file, request.content_length)
+    except ValueError as e:
+        flash(str(e))
+        return redirect(request.url)
+        
     if file.filename == '':
         flash('No selected file')
         return redirect(request.url)
@@ -157,8 +183,11 @@ def upload_file():
         temp_file_id = str(uuid.uuid4())
         temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_file_id)
         
+        logger.info(f"Processing upload: {original_filename} (temp ID: {temp_file_id})")
+        
         # Save the file to the uploads directory
         file.save(temp_file_path)
+        logger.debug(f"File saved to: {temp_file_path}")
 
         with open(temp_file_path, 'rb') as f:
             file_bytes = f.read()
@@ -166,9 +195,11 @@ def upload_file():
         try:
             # Try to decompress, assuming it's a gzipped .prproj file
             xml_content = gzip.decompress(file_bytes).decode('utf-8', errors='replace')
+            logger.debug("Successfully decompressed gzipped project file")
         except (gzip.BadGzipFile, OSError):
             # If decompression fails, it's likely already unzipped XML
             xml_content = file_bytes.decode('utf-8', errors='replace')
+            logger.debug("File appears to be uncompressed XML")
         
         try:
             # Step 1: Get the list of sequences to populate the dropdown
@@ -183,6 +214,7 @@ def upload_file():
 
         except Exception as e:
             # Catch errors during parsing or processing
+            logger.error(f"Error during sequence detection: {e}", exc_info=True)
             flash(f'An error occurred: {e}')
             return render_template('index.html')
 
@@ -190,21 +222,27 @@ def upload_file():
 
 
 if __name__ == '__main__':
+    # Configure logging
+    setup_logging(level=INFO)
+    
     # Create a 'templates' directory for the HTML file if it doesn't exist
     if not os.path.exists('components'):
         os.makedirs('components')
         with open('components/__init__.py', 'w') as f:
             pass # Create empty __init__.py
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
+    if not os.path.exists(config.UPLOAD_FOLDER):
+        os.makedirs(config.UPLOAD_FOLDER)
+        
+    # Run cleanup on startup
+    logger.info(f"Running scheduled cleanup of uploads directory: {config.UPLOAD_FOLDER}")
+    schedule_cleanup(config.UPLOAD_FOLDER)
 
     if not os.path.exists('templates'):
         os.makedirs('templates')
     
     # Check if index.html exists, if not, tell the user to create it.
     if not os.path.exists('templates/index.html'):
-        print("Please create a 'templates/index.html' file for the web interface.")
+        logger.warning("Please create a 'templates/index.html' file for the web interface.")
     
-
     app.run(debug=True)
 

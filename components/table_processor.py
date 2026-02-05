@@ -13,7 +13,7 @@ def process_data_for_tables(grouped_data_raw, per_instance_data_raw):
     grouped_headers_orig, grouped_rows_list = grouped_data_raw['headers'], grouped_data_raw['rows']
     
     # Manually set headers and reorder data for display
-    cleaned_grouped_headers = ["Clip name", "Clip type", "Instances count", "Instances Start and End (Separated by \"|\")"]
+    cleaned_grouped_headers = ["Clip name", "Clip type", "Instances count", "Instances Start and End (Separated by \"|\")", "Source", "Media ID", "Title"]
     
     # --- Create a map of clip names to their nested sources ---
     per_instance_headers_orig, raw_per_instance_data_for_grouping = per_instance_data_raw['headers'], per_instance_data_raw['rows']
@@ -42,7 +42,7 @@ def process_data_for_tables(grouped_data_raw, per_instance_data_raw):
                 end_tc = tc_from_seconds(tc_to_seconds(start_tc) + 1)
             new_instances.append(f"{start_tc}-{end_tc}")
         
-        reordered_row = [display_name, row[3], row[1], " | ".join(new_instances)]
+        reordered_row = [display_name, row[3], row[1], " | ".join(new_instances), row[4], row[5], row[6]]
         grouped_data.append(reordered_row)
 
     # --- Per-Instance Data Processing ---
@@ -58,7 +58,14 @@ def process_data_for_tables(grouped_data_raw, per_instance_data_raw):
             start_s = tc_to_seconds(start_tc)
             new_row[2] = tc_from_seconds(start_s + 1)
 
-        per_instance_data_for_table.append(new_row)
+        # Make sure we have the source, media_id, and source_title fields in the per-instance data
+        # The original row structure is: [name, start_tc, end_tc, type, source_seq, source, media_id, source_title]
+        if len(row) > 7:  # Check if we have all the fields we need
+            per_instance_data_for_table.append(new_row)
+        else:
+            # If the fields are missing, add empty values
+            extended_row = new_row + ['', '', ''] if len(new_row) <= 5 else new_row
+            per_instance_data_for_table.append(extended_row)
     
     print("[DEBUG] Finished: process_data_for_tables")
     return cleaned_grouped_headers, grouped_data, per_instance_data_for_table

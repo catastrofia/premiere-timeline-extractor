@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file. See [standa
 - Fixed `AttributeError: 'Logger' object has no attribute 'DEBUG'` in export_timeline_csv.py - changed `logger.DEBUG` to `DEBUG` (imported from components.logger)
 - Fixed `AttributeError: '_io.StringIO' object has no attribute 'string_io'` in app.py - LogCapture context manager returns StringIO directly, not via `.string_io` attribute
 - Fixed timeline visualizer showing empty - race condition where JavaScript rendered before data was loaded; moved data initialization to global `backendData` variable before loading results.js
+- Fixed `AttributeError: module 'defusedxml.ElementTree' has no attribute 'Element'` - imported `Element` from stdlib `xml.etree.ElementTree` for type hints while keeping defusedxml for secure parsing
 
 ## [1.3.0] - 2026-02-05
 

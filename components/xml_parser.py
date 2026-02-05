@@ -3,6 +3,7 @@ XML parsing utilities for Premiere Pro project files.
 Handles parsing XML content and building object maps.
 """
 import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Any
 import gzip
@@ -14,10 +15,10 @@ logger = get_logger()
 @dataclass
 class ParsedProject:
     """Container for parsed Premiere Pro project data."""
-    root: ET.Element
-    objectid_map: Dict[str, ET.Element]
-    objectuid_map: Dict[str, ET.Element]
-    sequence_name_map: Dict[str, ET.Element]
+    root: Element
+    objectid_map: Dict[str, Element]
+    objectuid_map: Dict[str, Element]
+    sequence_name_map: Dict[str, Element]
 
 def load_project_file(path: str) -> str:
     """

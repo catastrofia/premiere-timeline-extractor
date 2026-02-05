@@ -126,7 +126,7 @@ class XMLProjectParser:
             sequence_name_map=sequence_name_map
         )
     
-    def find_sequence_by_name(self, root: ET.Element, name: str) -> Optional[ET.Element]:
+    def find_sequence_by_name(self, root: Element, name: str) -> Optional[Element]:
         """
         Find a sequence element by its name.
         
@@ -144,7 +144,7 @@ class XMLProjectParser:
                         return e
         return None
     
-    def find_frame_rate_for_sequence(self, seq_elem: ET.Element, objectid_map: Dict[str, ET.Element]) -> Optional[int]:
+    def find_frame_rate_for_sequence(self, seq_elem: Element, objectid_map: Dict[str, Element]) -> Optional[int]:
         """
         Find the frame rate value for a sequence.
         
@@ -179,7 +179,7 @@ class XMLProjectParser:
                     
         return None
     
-    def list_named_sequences(self, root: ET.Element) -> List[str]:
+    def list_named_sequences(self, root: Element) -> List[str]:
         """
         List all named sequences in the project.
         
